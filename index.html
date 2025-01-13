@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>길이 빼기 수카드</title>
+<style>
+    body {
+        font-family: sans-serif;
+        background: #f0f0f0;
+        margin: 0;
+        padding: 0;
+    }
+    #game-container {
+        max-width: 700px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 20px;
+        box-sizing: border-box;
+        text-align: center;
+        position: relative;
+    }
+    h1 {
+        margin: 10px 0;
+    }
+    #difficulty-selection, #game-screen, #game-over-screen {
+        display: none;
+    }
+    .btn {
+        display: inline-block;
+        padding: 10px 15px;
+        margin: 10px 5px;
+        background: #4caf50;
+        color: #fff;
+        text-decoration: none;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+    .btn:hover {
+        background: #45a049;
+    }
+    #timer, #global-timer, #score, #lives, #chance-popup {
+        margin: 10px 0;
+        font-size: 18px;
+    }
+    #question {
+        font-size: 20px;
+        margin: 20px 0;
+    }
+    #answer-input {
+        font-size: 18px;
+        padding: 5px;
+        width: 100px;
+        text-align: center;
+    }
+    #submit-answer-btn {
+        font-size: 18px;
+        padding: 5px 10px;
+        margin-left: 10px;
+    }
+    #energy-bar-container {
+        width: 100%;
+        background: #ccc;
+        height: 20px;
+        border-radius: 10px;
+        margin: 20px 0;
+        position: relative;
+        overflow: hidden;
+    }
+    #energy-bar {
+        background: linear-gradient(to right, #ff5555, #ffaaaa);
+        width: 100%;
+        height: 100%;
+        transition: width 0.5s linear;
+    }
+    #result-message {
+        font-size: 18px;
+        margin: 20px 0;
+        color: #333;
+    }
+    #game-over-message {
+        font-size: 24px;
+        color: red;
+    }
+    /* 팝업 디자인 */
+    #popup {
+        display: none;
+        position: fixed;
+        left: 50%;
+        top: 30%;
+        transform: translate(-50%, -50%);
+        background: #fff;
+        border: 2px solid #4caf50;
+        padding: 20px;
+        z-index: 9999;
+        border-radius: 10px;
+    }
+    #popup-message {
+        font-size: 18px;
+        margin-bottom: 20px;
+    }
+    #popup-close-btn {
+        display: inline-block;
+        padding: 10px 15px;
+        background: #4caf50;
+        color: #fff;
+        text-decoration: none;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+    #popup-close-btn:hover {
+        background: #45a049;
+    }
+    /* 게임 종료 화면 */
+    #game-over-screen {
+        display: none;
+    }
+    #response {
+        margin-top: 20px;
+        font-size: 16px;
+        color: #333;
+        white-space: pre-wrap;
+    }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+    <h1>길이 빼기 수카드</h1>
+    <div id="start-screen">
+        <p>이름을 입력하고 난이도를 선택해주세요.</p>
+        <input type="text" id="player-name" placeholder="이름 입력" required>
+        <div>
+            <button class="btn" data-diff="최상">최상(20초, 정답당20점)</button>
+            <button class="btn" data-diff="상">상(30초, 정답당15점)</button>
+            <button class="btn" data-diff="중">중(40초, 정답당13점)</button>
+            <button class="btn" data-diff="하">하(시간제한없음, 정답당10점)</button>
+        </div>
+    </div>
+
+    <div id="difficulty-selection"></div>
+
+    <div id="game-screen">
+        <div id="global-timer">총 경과 시간: 0초</div>
+        <div id="lives">남은 기회 : 3</div>
+        <div id="score">점수 : 0</div>
+        <div id="timer"></div>
+        <div id="energy-bar-container"><div id="energy-bar"></div></div>
+        <div id="question"></div>
+        <input type="number" id="answer-input" placeholder="정답입력">
+        <button id="submit-answer-btn" class="btn">제출</button>
+        <div id="result-message"></div>
+    </div>
+
+    <div id="game-over-screen">
+        <div id="game-over-message">게임 종료! 총 점수: 0</div>
+        <button id="submit-score-btn" class="btn">점수 전송</button>
+        <div id="response"></div>
+    </div>
+
+    <div id="popup">
+        <div id="popup-message"></div>
+        <button id="popup-close-btn">닫기</button>
+    </div>
+</div>
+
+<script>
+// 50문제 데이터 (절대 생략 불가)
+
+// 1유형 25문제
+const type1Questions = [
+  {q: "길이가 2m 25cm인 색 테이프 중에서 75cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:150},
+  {q: "길이가 2m 40cm인 색 테이프 중에서 189cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:51},
+  {q: "길이가 2m 99cm인 색 테이프 중에서 120cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:179},
+  {q: "길이가 3m 30cm인 색 테이프 중에서 300cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:30},
+  {q: "길이가 3m 65cm인 색 테이프 중에서 100cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:265},
+  {q: "길이가 4m 4cm인 색 테이프 중에서 4cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:400},
+  {q: "길이가 4m 50cm인 색 테이프 중에서 250cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:200},
+  {q: "길이가 4m 99cm인 색 테이프 중에서 1cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:498},
+  {q: "길이가 5m 10cm인 색 테이프 중에서 500cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:10},
+  {q: "길이가 5m 55cm인 색 테이프 중에서 355cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:200},
+  {q: "길이가 6m 20cm인 색 테이프 중에서 100cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:520},
+  {q: "길이가 6m 59cm인 색 테이프 중에서 599cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:60},
+  {q: "길이가 7m 5cm인 색 테이프 중에서 350cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:355},
+  {q: "길이가 7m 10cm인 색 테이프 중에서 1cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:709},
+  {q: "길이가 7m 37cm인 색 테이프 중에서 699cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:38},
+  {q: "길이가 8m 20cm인 색 테이프 중에서 400cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:420},
+  {q: "길이가 8m 75cm인 색 테이프 중에서 775cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:100},
+  {q: "길이가 8m 10cm인 색 테이프 중에서 2cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:808},
+  {q: "길이가 9m 15cm인 색 테이프 중에서 450cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:465},
+  {q: "길이가 9m 50cm인 색 테이프 중에서 899cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:51},
+  {q: "길이가 9m 23cm인 색 테이프 중에서 123cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:800},
+  {q: "길이가 9m 99cm인 색 테이프 중에서 500cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:499},
+  {q: "길이가 9m 90cm인 색 테이프 중에서 100cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:890},
+  {q: "길이가 9m 10cm인 색 테이프 중에서 100cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:810},
+  {q: "길이가 9m 20cm인 색 테이프 중에서 10cm를 사용했습니다. 남은 색 테이프는 몇 cm입니까?", a:910}
+];
+
+// 2유형 25문제
+// 문제 표현: "다음 세 카드 [x] [y] [z] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요."
+const type2Questions = [
+  {q: "다음 세 카드 [1] [2] [4] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:297},
+  {q: "다음 세 카드 [1] [2] [5] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:396},
+  {q: "다음 세 카드 [1] [2] [6] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:495},
+  {q: "다음 세 카드 [1] [2] [7] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:594},
+  {q: "다음 세 카드 [1] [2] [8] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:693},
+  {q: "다음 세 카드 [1] [2] [9] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:792},
+  {q: "다음 세 카드 [1] [3] [4] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:297},
+  {q: "다음 세 카드 [1] [3] [5] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:396},
+  {q: "다음 세 카드 [1] [3] [6] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:495},
+  {q: "다음 세 카드 [1] [3] [7] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:594},
+  {q: "다음 세 카드 [1] [3] [8] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:693},
+  {q: "다음 세 카드 [1] [3] [9] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:792},
+  {q: "다음 세 카드 [1] [4] [5] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:396},
+  {q: "다음 세 카드 [1] [4] [6] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:495},
+  {q: "다음 세 카드 [1] [4] [7] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:594},
+  {q: "다음 세 카드 [1] [4] [8] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:693},
+  {q: "다음 세 카드 [1] [4] [9] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:792},
+  {q: "다음 세 카드 [1] [5] [6] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:495},
+  {q: "다음 세 카드 [1] [5] [7] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:594},
+  {q: "다음 세 카드 [1] [5] [8] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:693},
+  {q: "다음 세 카드 [1] [5] [9] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:792},
+  {q: "다음 세 카드 [1] [6] [7] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:594},
+  {q: "다음 세 카드 [1] [6] [8] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:693},
+  {q: "다음 세 카드 [1] [6] [9] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:792},
+  {q: "다음 세 카드 [1] [7] [8] 를 이용하여 만들 수 있는 가장 큰 세자리 수와 가장 작은 세자리 수의 차이를 구하세요?", a:693}
+];
+
+// 문제 배열: 1유형,2유형 번갈아가며 총 50문제
+let questions = [];
+for (let i=0; i<25; i++) {
+    questions.push(type1Questions[i]);
+    questions.push(type2Questions[i]);
+}
+
+// 난이도별 설정
+let difficultyTime = { "최상":20, "상":30, "중":40, "하":Infinity };
+let difficultyScore = { "최상":20, "상":15, "중":13, "하":10 };
+
+let currentDifficulty = null;
+let currentQuestionIndex = 0;
+let score = 0;
+let lives = 3;
+let globalTime = 0; // 총 경과 시간
+let energyDecrementInterval = null;
+let currentTimeLimit = Infinity; 
+let currentAnswer = null;
+let usedAllQuestions = false;
+let freePass = 0; // 면제권 횟수
+let playerName = "";
+
+// 서버 전송 관련
+function saveData(game, name, score, elapsedTime) {
+    const FUNCTION_URL = "https://us-central1-record-f420d.cloudfunctions.net/report";
+
+    const requestData = {
+        game,
+        name,
+        score: parseInt(score, 10),
+        elapsedTime: parseInt(elapsedTime, 10)
+    };
+
+    fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => response.json().then(data => ({ status: response.status, body: data })))
+    .then(({ status, body }) => {
+        if (status >= 200 && status < 300) {
+            document.getElementById('response').innerText = 
+                `성공: ${JSON.stringify(body, null, 2)}`;
+        } else {
+            document.getElementById('response').innerText = 
+                `오류: ${JSON.stringify(body, null, 2)}`;
+        }
+    })
+    .catch(error => {
+        console.error('요청 실패:', error);
+        document.getElementById('response').innerText = 
+            `네트워크 오류: ${error.message}`;
+    });
+}
+
+function getRandomQuestion() {
+    // 모든 질문을 순차적으로 사용하도록 수정
+    if (currentQuestionIndex >= questions.length) {
+        usedAllQuestions = true;
+    }
+
+    let qData;
+    if (!usedAllQuestions) {
+        qData = questions[currentQuestionIndex];
+        currentQuestionIndex++;
+    } else {
+        // 모든 질문을 사용한 후에는 더 이상 질문이 없으므로 게임을 종료하거나 반복할 수 있습니다.
+        // 여기서는 추가 질문을 랜덤으로 선택하지 않고 게임을 종료하도록 합니다.
+        gameOver();
+        return;
+    }
+
+    document.getElementById("question").textContent = qData.q;
+    currentAnswer = qData.a;
+
+    clearInterval(energyDecrementInterval);
+    if (currentTimeLimit !== Infinity) {
+        let remainTime = currentTimeLimit;
+        const energyBar = document.getElementById("energy-bar");
+        energyBar.style.width = "100%";
+        let decrement = 100 / (remainTime*2);
+        let intervalCount = 0;
+
+        energyDecrementInterval = setInterval(function(){
+            intervalCount++;
+            let w = 100 - decrement*intervalCount;
+            if (w <= 0) {
+                w = 0;
+                clearInterval(energyDecrementInterval);
+                timeUp();
+            }
+            energyBar.style.width = w+"%";
+        }, 500);
+    } else {
+        const energyBar = document.getElementById("energy-bar");
+        energyBar.style.width = "100%";
+    }
+}
+
+function chancePopupCheck() {
+    let rnd = Math.random();
+    if (rnd < 0.0001) {
+        showPopup("축하합니다! 5000원 상품권 당첨!");
+    } else if (rnd < 0.001) {
+        showPopup("축하합니다! 3000원 상품권 당첨!");
+    } else if (rnd < 0.002) {
+        showPopup("축하합니다! 1회 면제권 획득!");
+        freePass++;
+    }
+}
+
+function showPopup(msg) {
+    const popup = document.getElementById("popup");
+    const popupMessage = document.getElementById("popup-message");
+    popupMessage.textContent = msg;
+    popup.style.display = "block";
+}
+
+document.getElementById("popup-close-btn").addEventListener("click", function() {
+    document.getElementById("popup").style.display = "none";
+});
+
+function startGame(difficulty) {
+    playerName = document.getElementById("player-name").value.trim();
+    if (playerName === "") {
+        alert("이름을 입력해주세요.");
+        return;
+    }
+
+    currentDifficulty = difficulty;
+    currentTimeLimit = difficultyTime[difficulty];
+    score = 0;
+    lives = 3;
+    currentQuestionIndex = 0;
+    usedAllQuestions = false;
+    freePass = 0;
+    document.getElementById("start-screen").style.display = "none";
+    document.getElementById("game-screen").style.display = "block";
+    document.getElementById("score").textContent = "점수 : " + score;
+    document.getElementById("lives").textContent = "남은 기회 : " + lives;
+    document.getElementById("global-timer").textContent = "총 경과 시간: 0초";
+    globalTime = 0;
+
+    if (!window.globalTimerInterval) {
+        window.globalTimerInterval = setInterval(function() {
+            globalTime++;
+            document.getElementById("global-timer").textContent = "총 경과 시간: " + globalTime + "초";
+        },1000);
+    }
+    nextQuestion();
+}
+
+function nextQuestion() {
+    document.getElementById("answer-input").value = "";
+    document.getElementById("result-message").textContent = "";
+
+    getRandomQuestion();
+}
+
+function timeUp() {
+    if (lives > 0) {
+        lives--;
+        document.getElementById("lives").textContent = "남은 기회 : " + lives;
+        if (lives <= 0) {
+            gameOver();
+            return;
+        }
+    }
+    nextQuestion();
+}
+
+function checkAnswer() {
+    const userAnswer = parseInt(document.getElementById("answer-input").value,10);
+    if (isNaN(userAnswer)) return;
+    clearInterval(energyDecrementInterval);
+    document.getElementById("energy-bar").style.width = "100%";
+
+    if (userAnswer === currentAnswer) {
+        score += difficultyScore[currentDifficulty];
+        document.getElementById("score").textContent = "점수 : " + score;
+        document.getElementById("result-message").textContent = "정답!";
+        chancePopupCheck();
+        setTimeout(nextQuestion, 1000);
+    } else {
+        document.getElementById("result-message").textContent = "오답! 정답은 " + currentAnswer + " 입니다.";
+        setTimeout(function(){
+            if (freePass > 0) {
+                freePass--;
+            } else {
+                lives--;
+                document.getElementById("lives").textContent = "남은 기회 : " + lives;
+            }
+            if (lives <= 0) {
+                gameOver();
+            } else {
+                nextQuestion();
+            }
+        },2000);
+    }
+}
+
+function gameOver() {
+    clearInterval(energyDecrementInterval);
+    document.getElementById("game-screen").style.display = "none";
+    document.getElementById("game-over-screen").style.display = "block";
+    document.getElementById("game-over-message").textContent = "게임 종료! 총 점수: " + score;
+}
+
+// 난이도 선택
+document.querySelectorAll('#start-screen .btn').forEach(btn => {
+    btn.addEventListener('click', function(){
+        let diff = this.getAttribute("data-diff");
+        startGame(diff);
+    });
+});
+
+// 정답 제출
+document.getElementById("submit-answer-btn").addEventListener("click", checkAnswer);
+
+// 엔터키로 정답 제출
+document.getElementById("answer-input").addEventListener("keydown",function(e){
+    if (e.key==="Enter") {
+        checkAnswer();
+    }
+});
+
+// 점수 전송 버튼
+document.getElementById("submit-score-btn").addEventListener("click", function(){
+    saveData("길이 빼기 수카드", playerName, score, globalTime);
+});
+</script>
+</body>
+</html>
